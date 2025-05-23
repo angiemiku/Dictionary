@@ -5,7 +5,7 @@ const { fetch } = require('undici');
 const app = express();
 const port = 10000;
 
-const trim = (text, max) => text.length > max ? text.substring(0, max - 1) + '…' : text;
+const trim = (text, max) => text?.length > max ? text.substring(0, max - 1) + '…' : text;
 const cache = {};
 const autocompleteCache = {};
 
@@ -82,19 +82,26 @@ const generateMessage = async (word, page, hide) => {
   };
 };
 
-app.use(express.json({ verify: (req, res, buf) => req.rawBody = buf.toString() }));
+app.use(express.json({ verify: (req, res, buf) => req.rawBody = buf }));
 
 function verifyDiscordRequest(req, res, next) {
   const signature = req.get('X-Signature-Ed25519');
   const timestamp = req.get('X-Signature-Timestamp');
+  
+  if (!signature || !timestamp) {
+    return res.status(400).send('Missing Discord signature headers');
+  }
+  
   const isValid = nacl.sign.detached.verify(
-    Buffer.from(timestamp + req.rawBody),
+    Buffer.concat([Buffer.from(timestamp, 'utf8'), req.rawBody]),
     Buffer.from(signature, 'hex'),
     Buffer.from(publicKey, 'hex')
-  ); 
+  );
+  
   if (!isValid) {
     return res.status(401).send('Invalid request signature');
   }
+  
   next();
 };
 
