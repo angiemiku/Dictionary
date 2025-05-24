@@ -85,23 +85,15 @@ const generateMessage = async (word, page, hide) => {
 app.use(express.json({ verify: (req, res, buf) => req.rawBody = buf }));
 
 function verifyDiscordRequest(req, res, next) {
-  const signature = req.get('X-Signature-Ed25519');
-  const timestamp = req.get('X-Signature-Timestamp');
-  
-  if (!signature || !timestamp) {
-    return res.status(400).send('Missing Discord signature headers');
-  }
-  
+  const signature = req.headers['x-signature-ed25519'];
+  const timestamp = req.headers['x-signature-timestamp'];
+  if (!signature || !timestamp) return res.status(401).end();
   const isValid = nacl.sign.detached.verify(
     Buffer.concat([Buffer.from(timestamp, 'utf8'), req.rawBody]),
     Buffer.from(signature, 'hex'),
     Buffer.from(publicKey, 'hex')
   );
-  
-  if (!isValid) {
-    return res.status(401).send('Invalid request signature');
-  }
-  
+  if (!isValid) return res.status(401).end();
   next();
 };
 
